@@ -4,13 +4,28 @@ import { useState, useEffect } from 'react';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { 
   useAccount, 
-  useWriteContract,
-  useReadContract   // ← добавь эту строку
+  useWriteContract, 
+  useReadContract 
 } from 'wagmi';
 import { ethers } from 'ethers';
 
 const MEMO_ADDRESS = '0x5294E9927c3306DcBaDb03fe70b92e01cCede505';
 const USDC_ADDRESS = '0x3600000000000000000000000000000000000000';
+
+const MEMO_ABI = [
+  {
+    name: 'memo',
+    type: 'function',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'target', type: 'address' },
+      { name: 'data', type: 'bytes' },
+      { name: 'memoId', type: 'bytes32' },
+      { name: 'memoData', type: 'bytes' }
+    ],
+    outputs: [],
+  },
+] as const;
 
 export default function MemoArcSender() {
   const { isConnected, address } = useAccount();
@@ -24,7 +39,7 @@ export default function MemoArcSender() {
 
   const { writeContractAsync } = useWriteContract();
 
-  // Получаем баланс USDC через useReadContract (обход проблемы с useBalance)
+  // Баланс USDC
   const { data: balanceData } = useReadContract({
     address: USDC_ADDRESS as `0x${string}`,
     abi: [
@@ -37,11 +52,9 @@ export default function MemoArcSender() {
       },
     ],
     functionName: 'balanceOf',
-    args: [address as `0x${string}`],
-    query: { enabled: !!address },
+    args: address ? [address as `0x${string}`] : undefined,
   });
 
-  // Форматируем баланс
   useEffect(() => {
     if (balanceData) {
       const formatted = Number(ethers.formatUnits(balanceData as bigint, 6)).toFixed(4);
@@ -64,18 +77,17 @@ export default function MemoArcSender() {
       const memoId = ethers.id(`memo-${Date.now()}`);
       const memoBytes = ethers.toUtf8Bytes(memoText);
 
-      const memoInterface = new ethers.Interface([
-        "function memo(address target, bytes data, bytes32 memoId, bytes memoData)"
-      ]);
+      const transferData = new ethers.Interface([
+        "function transfer(address to, uint256 amount)"
+      ]).encodeFunctionData("transfer", [recipient, amountWei]);
 
       const hash = await writeContractAsync({
         address: MEMO_ADDRESS as `0x${string}`,
-        abi: memoInterface,
+        abi: MEMO_ABI,
         functionName: 'memo',
         args: [
           USDC_ADDRESS as `0x${string}`,
-          new ethers.Interface(["function transfer(address to, uint256 amount)"])
-            .encodeFunctionData("transfer", [recipient, amountWei]),
+          transferData,
           memoId,
           memoBytes
         ],
