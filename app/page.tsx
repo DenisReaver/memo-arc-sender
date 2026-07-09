@@ -1,8 +1,13 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
-import { useAccount, useBalance, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
+import { 
+  useAccount, 
+  useBalance, 
+  useWriteContract, 
+  useWaitForTransactionReceipt 
+} from 'wagmi';
 import { ethers } from 'ethers';
 
 const MEMO_ADDRESS = '0x5294E9927c3306DcBaDb03fe70b92e01cCede505';
@@ -17,10 +22,10 @@ export default function MemoArcSender() {
   const [txHash, setTxHash] = useState('');
   const [loading, setLoading] = useState(false);
 
-  // === Баланс через wagmi (рекомендуется) ===
+  // Баланс USDC
   const { data: usdcBalanceData } = useBalance({
-    address,
-    token: USDC_ADDRESS,
+    address: address as `0x${string}` | undefined,
+    token: USDC_ADDRESS as `0x${string}`,
   });
 
   const formattedBalance = usdcBalanceData 
@@ -28,6 +33,11 @@ export default function MemoArcSender() {
     : '0.0000';
 
   const { writeContractAsync } = useWriteContract();
+
+  // Для ожидания подтверждения транзакции
+  const { data: receipt } = useWaitForTransactionReceipt({
+    hash: txHash as `0x${string}` | undefined,
+  });
 
   const sendWithMemo = async () => {
     if (!recipient || !amount || !address) {
@@ -42,42 +52,40 @@ export default function MemoArcSender() {
       const memoId = ethers.id(`memo-${Date.now()}`);
       const memoBytes = ethers.toUtf8Bytes(memoText);
 
-      const transferData = new ethers.Interface([
-        "function transfer(address to, uint256 amount)"
-      ]).encodeFunctionData("transfer", [recipient, amountWei]);
-
       const memoInterface = new ethers.Interface([
         "function memo(address target, bytes data, bytes32 memoId, bytes memoData)"
       ]);
 
-      const data = memoInterface.encodeFunctionData("memo", [
-        USDC_ADDRESS,
-        transferData,
-        memoId,
-        memoBytes
-      ]);
-
       const hash = await writeContractAsync({
-        address: MEMO_ADDRESS,
+        address: MEMO_ADDRESS as `0x${string}`,
         abi: memoInterface,
         functionName: 'memo',
-        args: [USDC_ADDRESS, transferData, memoId, memoBytes],
+        args: [
+          USDC_ADDRESS as `0x${string}`,
+          new ethers.Interface(["function transfer(address to, uint256 amount)"])
+            .encodeFunctionData("transfer", [recipient, amountWei]),
+          memoId,
+          memoBytes
+        ],
       });
 
       setTxHash(hash);
-      alert('✅ Транзакция отправлена!');
-
-      // Ожидаем подтверждения
-      const receipt = await useWaitForTransactionReceipt({ hash }); // можно использовать хук отдельно
-      alert(`🎉 Успешно! Газ: ${receipt.gasUsed}`);
+      alert('✅ Транзакция отправлена в сеть!');
 
     } catch (e: any) {
       console.error(e);
       alert('❌ ' + (e.shortMessage || e.message || 'Ошибка отправки'));
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
   };
+
+  // Показываем уведомление после подтверждения
+  useState(() => {
+    if (receipt?.status === 'success' && txHash) {
+      alert(`🎉 Транзакция подтверждена! Газ: ${receipt.gasUsed}`);
+    }
+  });
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 flex items-center justify-center p-6">
