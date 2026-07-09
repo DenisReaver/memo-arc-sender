@@ -1,12 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { 
   useAccount, 
-  useBalance, 
-  useWriteContract, 
-  useWaitForTransactionReceipt 
+  useWriteContract 
 } from 'wagmi';
 import { ethers } from 'ethers';
 
@@ -21,23 +19,36 @@ export default function MemoArcSender() {
   const [memoText, setMemoText] = useState('Тестовое сообщение от Memo Arc Sender');
   const [txHash, setTxHash] = useState('');
   const [loading, setLoading] = useState(false);
-
-  // Баланс USDC
-  const { data: usdcBalanceData } = useBalance({
-    address: address as `0x${string}` | undefined,
-    token: USDC_ADDRESS as `0x${string}`,
-  });
-
-  const formattedBalance = usdcBalanceData 
-    ? Number(ethers.formatUnits(usdcBalanceData.value, 6)).toFixed(4)
-    : '0.0000';
+  const [formattedBalance, setFormattedBalance] = useState('0.0000');
 
   const { writeContractAsync } = useWriteContract();
 
-  // Для ожидания подтверждения транзакции
-  const { data: receipt } = useWaitForTransactionReceipt({
-    hash: txHash as `0x${string}` | undefined,
+  // Получаем баланс USDC через useReadContract (обход проблемы с useBalance)
+  const { data: balanceData } = useReadContract({
+    address: USDC_ADDRESS as `0x${string}`,
+    abi: [
+      {
+        name: 'balanceOf',
+        type: 'function',
+        stateMutability: 'view',
+        inputs: [{ name: 'account', type: 'address' }],
+        outputs: [{ name: '', type: 'uint256' }],
+      },
+    ],
+    functionName: 'balanceOf',
+    args: [address as `0x${string}`],
+    query: { enabled: !!address },
   });
+
+  // Форматируем баланс
+  useEffect(() => {
+    if (balanceData) {
+      const formatted = Number(ethers.formatUnits(balanceData as bigint, 6)).toFixed(4);
+      setFormattedBalance(formatted);
+    } else {
+      setFormattedBalance('0.0000');
+    }
+  }, [balanceData]);
 
   const sendWithMemo = async () => {
     if (!recipient || !amount || !address) {
@@ -79,13 +90,6 @@ export default function MemoArcSender() {
       setLoading(false);
     }
   };
-
-  // Показываем уведомление после подтверждения
-  useState(() => {
-    if (receipt?.status === 'success' && txHash) {
-      alert(`🎉 Транзакция подтверждена! Газ: ${receipt.gasUsed}`);
-    }
-  });
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 flex items-center justify-center p-6">
