@@ -4,7 +4,8 @@ import { useState, useEffect } from 'react';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { 
   useAccount, 
-  useWriteContract 
+  useWriteContract,
+  useReadContract   // ← добавь эту строку
 } from 'wagmi';
 import { ethers } from 'ethers';
 
