@@ -87,9 +87,9 @@ export default function MemoArcSender() {
         functionName: 'memo',
         args: [
           USDC_ADDRESS as `0x${string}`,
-          transferData,
+          transferData as `0x${string}`,        // ← исправлено
           memoId,
-          memoBytes
+          memoBytes as `0x${string}`            // ← исправлено
         ],
       });
 
