@@ -88,8 +88,8 @@ export default function MemoArcSender() {
         args: [
           USDC_ADDRESS as `0x${string}`,
           transferData as `0x${string}`,
-          memoId as `0x${string}`,           // ← исправлено
-          memoBytes as `0x${string}`         // ← исправлено
+          memoId as `0x${string}`,
+          ethers.hexlify(memoBytes) as `0x${string}`   // ← Вот главное исправление
         ],
       });
 
