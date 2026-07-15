@@ -27,18 +27,8 @@ export default function MemoArcSender() {
   const [txHash, setTxHash] = useState('');
   const [loading, setLoading] = useState(false);
   const [usdcBalance, setUsdcBalance] = useState('0.000000');
-  const [showNetworkWarning, setShowNetworkWarning] = useState(false);
 
   const isWrongNetwork = isConnected && chainId !== ARC_CHAIN_ID;
-
-  // Автоматическое показывание предупреждения при подключении к неправильной сети
-  useEffect(() => {
-    if (isConnected) {
-      setShowNetworkWarning(chainId !== ARC_CHAIN_ID);
-    } else {
-      setShowNetworkWarning(false);
-    }
-  }, [isConnected, chainId]);
 
   // Баланс USDC
   useEffect(() => {
@@ -70,17 +60,30 @@ export default function MemoArcSender() {
   const connectWalletConnect = () => 
     connect({ connector: walletConnect({ projectId: 'da13e8b76983976be4b39ecba29072bd' }) });
 
-  const switchToArcNetwork = async () => {
+  const switchToArc = async () => {
     try {
       await switchChain({ chainId: ARC_CHAIN_ID });
-    } catch (e: any) {
-      alert('Не удалось автоматически переключить сеть.\n\nПожалуйста, выберите ARC Testnet вручную в кошельке (Chain ID: 5042002)');
+    } catch (e) {
+      alert('Не удалось переключить сеть автоматически.\n\nПереключите вручную на ARC Testnet (Chain ID: 5042002)');
     }
   };
 
   const sendWithMemo = async () => {
     if (!recipient || !amount) return alert('Заполни все поля');
-    if (isWrongNetwork) return alert('Сначала переключитесь на ARC Testnet');
+
+    // === ЯВНАЯ ПРОВЕРКА СЕТИ ПЕРЕД ОТПРАВКОЙ ===
+    if (isWrongNetwork || chainId !== ARC_CHAIN_ID) {
+      const confirmSwitch = window.confirm(
+        'Вы находитесь в неправильной сети!\n\n' +
+        'Для отправки USDC с Memo нужна сеть ARC Testnet (Chain ID: 5042002)\n\n' +
+        'Переключить сеть сейчас?'
+      );
+      
+      if (confirmSwitch) {
+        await switchToArc();
+      }
+      return;
+    }
 
     setLoading(true);
     setTxHash('');
@@ -115,9 +118,7 @@ export default function MemoArcSender() {
 
       const receipt = await tx.wait();
       if (receipt) {
-        alert(`🎉 Успешно! Блок: ${receipt.blockNumber}`);
-      } else {
-        alert('✅ Транзакция подтверждена!');
+        alert(`🎉 Успешно подтверждено! Блок: ${receipt.blockNumber}`);
       }
     } catch (e: any) {
       console.error(e);
@@ -133,45 +134,34 @@ export default function MemoArcSender() {
         <div className="text-center mb-10">
           <div className="inline-block bg-cyan-500/10 text-cyan-400 text-6xl mb-4 p-4 rounded-2xl">📝</div>
           <h1 className="text-5xl font-bold tracking-tight">Memo Arc Sender</h1>
-          <p className="text-slate-400 mt-3 text-lg">USDC + Memo в одной транзакции • ARC Testnet</p>
+          <p className="text-slate-400 mt-3 text-lg">USDC + Memo в одной транзакции</p>
         </div>
 
         {!isConnected && (
           <div className="flex flex-col gap-4 mb-8">
-            <button 
-              onClick={connectMetaMask}
-              className="bg-orange-600 hover:bg-orange-700 py-4 rounded-2xl font-semibold text-lg transition"
-            >
+            <button onClick={connectMetaMask} className="bg-orange-600 hover:bg-orange-700 py-4 rounded-2xl font-semibold text-lg transition">
               Подключить MetaMask
             </button>
-            <button 
-              onClick={connectWalletConnect}
-              className="bg-blue-600 hover:bg-blue-700 py-4 rounded-2xl font-semibold text-lg transition"
-            >
+            <button onClick={connectWalletConnect} className="bg-blue-600 hover:bg-blue-700 py-4 rounded-2xl font-semibold text-lg transition">
               Подключить WalletConnect
             </button>
           </div>
         )}
 
-        {/* Автоматическое предупреждение о сети */}
-        {isConnected && showNetworkWarning && (
-          <div className="bg-red-600/10 border-2 border-red-500 text-red-400 p-6 rounded-2xl mb-8 text-center">
-            <p className="text-xl font-bold mb-2">⚠️ Неправильная сеть!</p>
-            <p className="mb-5">Для работы приложения нужна сеть ARC Testnet</p>
-            
-            <button
-              onClick={switchToArcNetwork}
-              className="w-full bg-red-500 hover:bg-red-600 text-white font-semibold py-4 rounded-2xl text-lg transition mb-3"
-            >
-              Переключиться на ARC Testnet
-            </button>
-            
-            <p className="text-sm text-red-400/70">Chain ID: 5042002</p>
-          </div>
-        )}
-
-        {isConnected && !showNetworkWarning && (
+        {isConnected && (
           <div className="space-y-6">
+            {isWrongNetwork && (
+              <div className="bg-red-500/10 border border-red-500 text-red-400 p-5 rounded-2xl text-center">
+                <p className="font-semibold">⚠️ Вы в неправильной сети</p>
+                <button
+                  onClick={switchToArc}
+                  className="mt-3 w-full bg-red-500 hover:bg-red-600 text-white py-3 rounded-xl font-medium"
+                >
+                  Переключиться на ARC Testnet
+                </button>
+              </div>
+            )}
+
             <div className="bg-slate-800/50 border border-slate-700 rounded-2xl p-5 text-center">
               <p className="text-slate-400 text-sm">Баланс USDC</p>
               <p className="text-4xl font-semibold text-cyan-400 mt-1">
@@ -208,16 +198,12 @@ export default function MemoArcSender() {
               disabled={loading}
               className="w-full bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 py-4 rounded-2xl font-semibold text-xl transition-all disabled:opacity-50"
             >
-              {loading ? 'Отправка на ARC...' : 'Отправить USDC с Memo'}
+              {loading ? 'Отправка...' : 'Отправить USDC с Memo'}
             </button>
 
             {txHash && (
               <div className="text-center pt-4">
-                <a 
-                  href={`https://testnet.arcscan.app/tx/${txHash}`} 
-                  target="_blank" 
-                  className="text-cyan-400 hover:text-cyan-300 break-all text-sm"
-                >
+                <a href={`https://testnet.arcscan.app/tx/${txHash}`} target="_blank" className="text-cyan-400 hover:text-cyan-300 break-all text-sm">
                   {txHash}
                 </a>
               </div>
