@@ -1,107 +1,105 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { ConnectButton } from '@rainbow-me/rainbowkit';
-import { 
-  useAccount, 
-  useWriteContract, 
-  useReadContract 
-} from 'wagmi';
+import { useAccount, useConnect } from 'wagmi';
+import { injected, walletConnect } from 'wagmi/connectors';
 import { ethers } from 'ethers';
 
 const MEMO_ADDRESS = '0x5294E9927c3306DcBaDb03fe70b92e01cCede505';
 const USDC_ADDRESS = '0x3600000000000000000000000000000000000000';
 
-const MEMO_ABI = [
-  {
-    name: 'memo',
-    type: 'function',
-    stateMutability: 'nonpayable',
-    inputs: [
-      { name: 'target', type: 'address' },
-      { name: 'data', type: 'bytes' },
-      { name: 'memoId', type: 'bytes32' },
-      { name: 'memoData', type: 'bytes' }
-    ],
-    outputs: [],
-  },
-] as const;
-
 export default function MemoArcSender() {
   const { isConnected, address } = useAccount();
-  
+  const { connect } = useConnect();
+
   const [recipient, setRecipient] = useState('');
   const [amount, setAmount] = useState('1');
   const [memoText, setMemoText] = useState('Тестовое сообщение от Memo Arc Sender');
   const [txHash, setTxHash] = useState('');
   const [loading, setLoading] = useState(false);
-  const [formattedBalance, setFormattedBalance] = useState('0.0000');
-
-  const { writeContractAsync } = useWriteContract();
-
-  // Баланс USDC
-  const { data: balanceData } = useReadContract({
-    address: USDC_ADDRESS as `0x${string}`,
-    abi: [
-      {
-        name: 'balanceOf',
-        type: 'function',
-        stateMutability: 'view',
-        inputs: [{ name: 'account', type: 'address' }],
-        outputs: [{ name: '', type: 'uint256' }],
-      },
-    ],
-    functionName: 'balanceOf',
-    args: address ? [address as `0x${string}`] : undefined,
-  });
+  const [usdcBalance, setUsdcBalance] = useState('0.0000');
 
   useEffect(() => {
-    if (balanceData) {
-      const formatted = Number(ethers.formatUnits(balanceData as bigint, 6)).toFixed(4);
-      setFormattedBalance(formatted);
-    } else {
-      setFormattedBalance('0.0000');
-    }
-  }, [balanceData]);
+    const fetchBalance = async () => {
+      if (!address) {
+        setUsdcBalance('0.0000');
+        return;
+      }
+      try {
+        const provider = new ethers.BrowserProvider(window.ethereum!);
+        const balance = await provider.getBalance(address);
+        const formatted = ethers.formatUnits(balance, 6);
+        setUsdcBalance(Number(formatted).toFixed(4));
+      } catch (e) {
+        console.error(e);
+        setUsdcBalance('0.0000');
+      }
+    };
 
-  const sendWithMemo = async () => {
-    if (!recipient || !amount || !address) {
-      return alert('Заполни все поля');
-    }
+    fetchBalance();
+  }, [address]);
+
+  const connectMetaMask = () => connect({ connector: injected() });
+  const connectWalletConnect = () => connect({ connector: walletConnect({ projectId: 'твой_project_id_сюда' }) });
+
+const sendWithMemo = async () => {
+    if (!recipient || !amount) return alert('Заполни все поля');
 
     setLoading(true);
-    setTxHash('');
 
     try {
+      const provider = new ethers.BrowserProvider(window.ethereum!);
+      const signer = await provider.getSigner();
+
       const amountWei = ethers.parseUnits(amount, 6);
-      const memoId = ethers.id(`memo-${Date.now()}`);
-      const memoBytes = ethers.toUtf8Bytes(memoText);
 
       const transferData = new ethers.Interface([
         "function transfer(address to, uint256 amount)"
       ]).encodeFunctionData("transfer", [recipient, amountWei]);
 
-      const hash = await writeContractAsync({
-        address: MEMO_ADDRESS as `0x${string}`,
-        abi: MEMO_ABI,
-        functionName: 'memo',
-        args: [
-          USDC_ADDRESS as `0x${string}`,
-          transferData as `0x${string}`,
-          memoId as `0x${string}`,
-          ethers.hexlify(memoBytes) as `0x${string}`   // ← Вот главное исправление
-        ],
+      const memoId = ethers.id(`memo-${Date.now()}`);
+      const memoBytes = ethers.toUtf8Bytes(memoText);
+
+      const memoInterface = new ethers.Interface([
+        "function memo(address target, bytes data, bytes32 memoId, bytes memoData)"
+      ]);
+
+      const data = memoInterface.encodeFunctionData("memo", [
+        USDC_ADDRESS, transferData, memoId, memoBytes
+      ]);
+
+      const gasEstimate = await provider.estimateGas({
+        to: MEMO_ADDRESS,
+        data,
+        from: address,
       });
 
-      setTxHash(hash);
-      alert('✅ Транзакция отправлена в сеть!');
+      const feeData = await provider.getFeeData();
+
+      const tx = await signer.sendTransaction({
+        to: MEMO_ADDRESS,
+        data,
+        gasLimit: Math.floor(Number(gasEstimate) * 2.0),
+        maxFeePerGas: feeData.maxFeePerGas 
+          ? feeData.maxFeePerGas * 400n / 100n 
+          : ethers.parseUnits("0.8", 6),
+        maxPriorityFeePerGas: feeData.maxPriorityFeePerGas 
+          ? feeData.maxPriorityFeePerGas * 450n / 100n 
+          : ethers.parseUnits("0.2", 6),
+      });
+
+      setTxHash(tx.hash);
+      alert('✅ Транзакция отправлена!');
+
+      const receipt = await tx.wait();
+      alert(`🎉 Успешно! Газ: ${receipt.gasUsed}`);
 
     } catch (e: any) {
       console.error(e);
-      alert('❌ ' + (e.shortMessage || e.message || 'Ошибка отправки'));
-    } finally {
-      setLoading(false);
+      alert('❌ ' + (e.shortMessage || e.message));
     }
+
+    setLoading(false);
   };
 
   return (
@@ -110,20 +108,32 @@ export default function MemoArcSender() {
         <div className="text-center mb-10">
           <div className="inline-block bg-cyan-500/10 text-cyan-400 text-6xl mb-4 p-4 rounded-2xl">📝</div>
           <h1 className="text-5xl font-bold tracking-tight">Memo Arc Sender</h1>
-          <p className="text-slate-400 mt-3 text-lg">Быстрая отправка USDC с memo на Arc Testnet</p>
+          <p className="text-slate-400 mt-3 text-lg">Быстрая отправка USDC с memo</p>
         </div>
 
-        <div className="flex justify-center mb-8">
-          <ConnectButton label="Подключить кошелёк" showBalance={true} />
-        </div>
+        {!isConnected && (
+          <div className="flex flex-col gap-4 mb-8">
+            <button 
+              onClick={connectMetaMask}
+              className="bg-orange-600 hover:bg-orange-700 py-4 rounded-2xl font-semibold text-lg"
+            >
+              Подключить MetaMask (ПК)
+            </button>
+            <button 
+              onClick={connectWalletConnect}
+              className="bg-blue-600 hover:bg-blue-700 py-4 rounded-2xl font-semibold text-lg"
+            >
+              Подключить WalletConnect (Мобильный + QR)
+            </button>
+          </div>
+        )}
 
         {isConnected && (
           <div className="space-y-6">
             <div className="bg-slate-800/50 border border-slate-700 rounded-2xl p-5 text-center">
               <p className="text-slate-400 text-sm">Баланс USDC</p>
               <p className="text-4xl font-semibold text-cyan-400 mt-1">
-                {formattedBalance} 
-                <span className="text-2xl text-slate-400 ml-2">USDC</span>
+                {usdcBalance} <span className="text-2xl text-slate-400">USDC</span>
               </p>
             </div>
 
@@ -154,18 +164,14 @@ export default function MemoArcSender() {
             <button
               onClick={sendWithMemo}
               disabled={loading}
-              className="w-full bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 py-4 rounded-2xl font-semibold text-xl transition-all disabled:opacity-50 shadow-lg shadow-cyan-500/30"
+              className="w-full bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 py-4 rounded-2xl font-semibold text-xl transition-all disabled:opacity-50"
             >
               {loading ? 'Отправляем...' : 'Отправить USDC с Memo'}
             </button>
 
             {txHash && (
               <div className="text-center pt-4">
-                <a 
-                  href={`https://testnet.arcscan.app/tx/${txHash}`} 
-                  target="_blank" 
-                  className="text-cyan-400 hover:text-cyan-300 text-sm break-all"
-                >
+                <a href={`https://testnet.arcscan.app/tx/${txHash}`} target="_blank" className="text-cyan-400 hover:text-cyan-300 break-all">
                   {txHash}
                 </a>
               </div>
