@@ -40,7 +40,7 @@ export default function MemoArcSender() {
   }, [address]);
 
   const connectMetaMask = () => connect({ connector: injected() });
-  const connectWalletConnect = () => connect({ connector: walletConnect({ projectId: 'твой_project_id_сюда' }) });
+  const connectWalletConnect = () => connect({ connector: walletConnect({ projectId: 'da13e8b76983976be4b39ecba29072bd' }) });
 
 const sendWithMemo = async () => {
     if (!recipient || !amount) return alert('Заполни все поля');
@@ -115,13 +115,13 @@ const sendWithMemo = async () => {
           <div className="flex flex-col gap-4 mb-8">
             <button 
               onClick={connectMetaMask}
-              className="bg-orange-600 hover:bg-orange-700 py-4 rounded-2xl font-semibold text-lg"
+              className="bg-orange-600 hover:bg-orange-700 py-4 rounded-2xl font-semibold text-lg transition"
             >
               Подключить MetaMask (ПК)
             </button>
             <button 
               onClick={connectWalletConnect}
-              className="bg-blue-600 hover:bg-blue-700 py-4 rounded-2xl font-semibold text-lg"
+              className="bg-blue-600 hover:bg-blue-700 py-4 rounded-2xl font-semibold text-lg transition"
             >
               Подключить WalletConnect (Мобильный + QR)
             </button>
