@@ -22,7 +22,7 @@ export default function MemoArcSender() {
 
   const [recipient, setRecipient] = useState('');
   const [amount, setAmount] = useState('1');
-  const [memoText, setMemoText] = useState('Тестовое сообщение от Memo Arc Sender');
+  const [memoText, setMemoText] = useState('Test message from Memo Arc Sender');
   const [txHash, setTxHash] = useState('');
   const [loading, setLoading] = useState(false);
   const [usdcBalance, setUsdcBalance] = useState('0.000000');
@@ -81,14 +81,14 @@ export default function MemoArcSender() {
     try {
       await switchChain({ chainId: ARC_CHAIN_ID });
     } catch (e) {
-      alert('Не удалось переключить автоматически.\n\nПереключи вручную на ARC Testnet (Chain ID: 5042002)');
+      alert('Automatic switching failed..\n\nManually switch to ARC Testnet (Chain ID: 5042002)');
     }
   };
 
   const sendWithMemo = async () => {
-    if (!recipient || !amount) return alert('Заполни все поля');
+    if (!recipient || !amount) return alert('Fill in all the fields.');
     if (isWrongNetwork) {
-      alert('❌ Вы не в сети ARC Testnet!\n\nНажмите кнопку выше для переключения.');
+      alert('❌ You are not connected to the ARC Testnet!\n\nPress the button above to switch.');
       return;
     }
 
@@ -116,10 +116,10 @@ export default function MemoArcSender() {
       });
 
       setTxHash(tx.hash);
-      alert('✅ Транзакция отправлена!');
+      alert('✅ Transaction sent!');
 
       const receipt = await tx.wait();
-      if (receipt) alert(`🎉 Успешно! Блок: ${receipt.blockNumber}`);
+      if (receipt) alert(`🎉 Success! Block: ${receipt.blockNumber}`);
     } catch (e: any) {
       console.error(e);
       alert('❌ ' + (e.shortMessage || e.message));
@@ -140,10 +140,10 @@ export default function MemoArcSender() {
         {!isConnected && (
           <div className="flex flex-col gap-4 mb-8">
             <button onClick={connectMetaMask} className="bg-orange-600 hover:bg-orange-700 py-4 rounded-2xl font-semibold text-lg transition">
-              Подключить MetaMask
+              Connect MetaMask
             </button>
             <button onClick={connectWalletConnect} className="bg-blue-600 hover:bg-blue-700 py-4 rounded-2xl font-semibold text-lg transition">
-              Подключить WalletConnect
+              Connect WalletConnect (maybe soon)
             </button>
           </div>
         )}
@@ -157,18 +157,18 @@ export default function MemoArcSender() {
                   onClick={switchToArc}
                   className="w-full bg-red-600 hover:bg-red-700 py-4 rounded-2xl font-semibold text-lg transition"
                 >
-                  🔄 Переключиться на ARC Testnet (5042002)
+                  🔄 Switch to ARC Testnet (don't forget to refresh the page after switching)
                 </button>
               ) : (
                 <div className="bg-emerald-500/20 border border-emerald-500 text-emerald-400 py-4 rounded-2xl text-center font-medium">
-                  ✅ Сейчас в сети ARC Testnet
+                  ✅ Currently on the ARC Testnet !
                 </div>
               )}
             </div>
 
             <div className="space-y-6">
               <div className="bg-slate-800/50 border border-slate-700 rounded-2xl p-5 text-center">
-                <p className="text-slate-400 text-sm">Баланс USDC</p>
+                <p className="text-slate-400 text-sm">USDC balance</p>
                 <p className="text-4xl font-semibold text-cyan-400 mt-1">
                   {usdcBalance} <span className="text-2xl text-slate-400">USDC</span>
                 </p>
@@ -178,7 +178,7 @@ export default function MemoArcSender() {
                 type="text"
                 value={recipient}
                 onChange={(e) => setRecipient(e.target.value)}
-                placeholder="Адрес получателя (0x...)"
+                placeholder="Recipient address (0x...)"
                 className="w-full bg-slate-800 border border-slate-600 rounded-2xl px-5 py-4 focus:border-cyan-500 focus:outline-none text-white"
               />
 
@@ -187,14 +187,14 @@ export default function MemoArcSender() {
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
                 step="0.000001"
-                placeholder="Сумма USDC"
+                placeholder="USDC amount"
                 className="w-full bg-slate-800 border border-slate-600 rounded-2xl px-5 py-4 focus:border-cyan-500 focus:outline-none text-white"
               />
 
               <textarea
                 value={memoText}
                 onChange={(e) => setMemoText(e.target.value)}
-                placeholder="Сообщение в memo..."
+                placeholder="Message in the memo..."
                 className="w-full bg-slate-800 border border-slate-600 rounded-2xl px-5 py-4 h-32 focus:border-cyan-500 focus:outline-none text-white resize-y"
               />
 
@@ -203,7 +203,7 @@ export default function MemoArcSender() {
                 disabled={loading}
                 className="w-full bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 py-4 rounded-2xl font-semibold text-xl transition-all disabled:opacity-50"
               >
-                {loading ? 'Отправка...' : 'Отправить USDC с Memo'}
+                {loading ? 'Sending...' : 'Send USDC with Memo'}
               </button>
 
               {txHash && (
@@ -219,11 +219,11 @@ export default function MemoArcSender() {
 
  {/* Социальные ссылки */}
         <div className="mt-12 pt-6 border-t border-slate-700 text-center">
-          <p className="text-slate-400 text-sm mb-4">Следите за обновлениями</p>
+          <p className="text-slate-400 text-sm mb-4">stay tuned</p>
           
           <div className="flex justify-center gap-8 text-3xl">
             <a 
-              href="https://twitter.com/твой_ник" 
+              href="https://x.com/DenisArhipov6" 
               target="_blank" 
               rel="noopener noreferrer"
               className="hover:text-cyan-400 transition-all hover:scale-110"
@@ -231,7 +231,7 @@ export default function MemoArcSender() {
               𝕏
             </a>
             <a 
-              href="https://warpcast.com/твой_ник" 
+              href="https://farcaster.xyz/tomasshelby.eth" 
               target="_blank" 
               rel="noopener noreferrer"
               className="hover:text-cyan-400 transition-all hover:scale-110"
@@ -239,7 +239,7 @@ export default function MemoArcSender() {
               Farcaster
             </a>
             <a 
-              href="https://discord.gg/твой_инвайт" 
+              href="https://discord.com/users/982960997142777879" 
               target="_blank" 
               rel="noopener noreferrer"
               className="hover:text-cyan-400 transition-all hover:scale-110"
