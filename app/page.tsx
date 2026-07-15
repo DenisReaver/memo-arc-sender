@@ -5,6 +5,13 @@ import { useAccount, useConnect } from 'wagmi';
 import { injected, walletConnect } from 'wagmi/connectors';
 import { ethers } from 'ethers';
 
+// Расширяем тип Window для TypeScript
+declare global {
+  interface Window {
+    ethereum?: any;
+  }
+}
+
 const MEMO_ADDRESS = '0x5294E9927c3306DcBaDb03fe70b92e01cCede505';
 const USDC_ADDRESS = '0x3600000000000000000000000000000000000000';
 
@@ -19,9 +26,9 @@ export default function MemoArcSender() {
   const [loading, setLoading] = useState(false);
   const [usdcBalance, setUsdcBalance] = useState('0.0000');
 
-  // Баланс USDC (только на клиенте)
+  // Баланс USDC
   useEffect(() => {
-    if (typeof window === 'undefined' || !address) {
+    if (!address) {
       setUsdcBalance('0.0000');
       return;
     }
@@ -32,8 +39,9 @@ export default function MemoArcSender() {
           setUsdcBalance('0.0000');
           return;
         }
+
         const provider = new ethers.BrowserProvider(window.ethereum);
-        const balance = await provider.getBalance(address);
+        const balance = await provider.getBalance(address); // ← Здесь ты берёшь нативный баланс, а не USDC!
         const formatted = ethers.formatUnits(balance, 6);
         setUsdcBalance(Number(formatted).toFixed(4));
       } catch (e) {
@@ -46,7 +54,8 @@ export default function MemoArcSender() {
   }, [address]);
 
   const connectMetaMask = () => connect({ connector: injected() });
-  const connectWalletConnect = () => connect({ connector: walletConnect({ projectId: 'da13e8b76983976be4b39ecba29072bd' }) });
+  const connectWalletConnect = () => 
+    connect({ connector: walletConnect({ projectId: 'da13e8b76983976be4b39ecba29072bd' }) });
 
   const sendWithMemo = async () => {
     if (!recipient || !amount) return alert('Заполни все поля');
@@ -54,7 +63,7 @@ export default function MemoArcSender() {
     setLoading(true);
 
     try {
-      if (typeof window === 'undefined' || !window.ethereum) {
+      if (!window.ethereum) {
         return alert('Кошелёк не найден');
       }
 
@@ -77,11 +86,12 @@ export default function MemoArcSender() {
       const tx = await signer.sendTransaction({
         to: MEMO_ADDRESS,
         data: memoInterface.encodeFunctionData("memo", [
-          USDC_ADDRESS, transferData, memoId, memoBytes
+          USDC_ADDRESS, 
+          transferData, 
+          memoId, 
+          memoBytes
         ]),
         gasLimit: 450000,
-        maxFeePerGas: ethers.parseUnits("0.5", 6),
-        maxPriorityFeePerGas: ethers.parseUnits("0.1", 6),
       });
 
       setTxHash(tx.hash);
@@ -92,10 +102,10 @@ export default function MemoArcSender() {
 
     } catch (e: any) {
       console.error(e);
-      alert('❌ ' + (e.shortMessage || e.message));
+      alert('❌ ' + (e.shortMessage || e.message || e));
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
   };
 
   return (
@@ -167,7 +177,11 @@ export default function MemoArcSender() {
 
             {txHash && (
               <div className="text-center pt-4">
-                <a href={`https://testnet.arcscan.app/tx/${txHash}`} target="_blank" className="text-cyan-400 hover:text-cyan-300 break-all">
+                <a 
+                  href={`https://testnet.arcscan.app/tx/${txHash}`} 
+                  target="_blank" 
+                  className="text-cyan-400 hover:text-cyan-300 break-all"
+                >
                   {txHash}
                 </a>
               </div>
