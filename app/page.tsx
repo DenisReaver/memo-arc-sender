@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useAccount, useConnect, useChainId } from 'wagmi';
+import { useAccount, useConnect, useChainId, useSwitchChain } from 'wagmi';
 import { injected, walletConnect } from 'wagmi/connectors';
 import { ethers } from 'ethers';
 
@@ -19,6 +19,7 @@ export default function MemoArcSender() {
   const { isConnected, address } = useAccount();
   const { connect } = useConnect();
   const chainId = useChainId();
+  const { switchChain } = useSwitchChain();
 
   const [recipient, setRecipient] = useState('');
   const [amount, setAmount] = useState('1');
@@ -26,16 +27,12 @@ export default function MemoArcSender() {
   const [txHash, setTxHash] = useState('');
   const [loading, setLoading] = useState(false);
   const [usdcBalance, setUsdcBalance] = useState('0.000000');
-  const [isWrongNetwork, setIsWrongNetwork] = useState(false);
 
-  // Проверка сети
-  useEffect(() => {
-    setIsWrongNetwork(isConnected && chainId !== ARC_CHAIN_ID);
-  }, [isConnected, chainId]);
+  const isWrongNetwork = isConnected && chainId !== ARC_CHAIN_ID;
 
   // Баланс USDC
   useEffect(() => {
-    if (!address || chainId !== ARC_CHAIN_ID) {
+    if (!address || isWrongNetwork) {
       setUsdcBalance('0.000000');
       return;
     }
@@ -43,7 +40,6 @@ export default function MemoArcSender() {
     const fetchUSDCBalance = async () => {
       try {
         if (!window.ethereum) return;
-
         const provider = new ethers.BrowserProvider(window.ethereum);
         const usdcAbi = ["function balanceOf(address account) view returns (uint256)"];
         const usdcContract = new ethers.Contract(USDC_ADDRESS, usdcAbi, provider);
@@ -58,15 +54,23 @@ export default function MemoArcSender() {
     };
 
     fetchUSDCBalance();
-  }, [address, chainId]);
+  }, [address, isWrongNetwork]);
 
   const connectMetaMask = () => connect({ connector: injected() });
   const connectWalletConnect = () => 
     connect({ connector: walletConnect({ projectId: 'da13e8b76983976be4b39ecba29072bd' }) });
 
+  const handleSwitchNetwork = async () => {
+    try {
+      await switchChain({ chainId: ARC_CHAIN_ID });
+    } catch (e: any) {
+      alert('Не удалось переключить сеть. Пожалуйста, переключите вручную в кошельке на ARC Testnet (Chain ID: 5042002)');
+    }
+  };
+
   const sendWithMemo = async () => {
     if (!recipient || !amount) return alert('Заполни все поля');
-    if (chainId !== ARC_CHAIN_ID) return alert('Пожалуйста, переключитесь на ARC Testnet (Chain ID: 5042002)');
+    if (isWrongNetwork) return alert('Сначала переключитесь на ARC Testnet');
 
     setLoading(true);
     setTxHash('');
@@ -92,12 +96,7 @@ export default function MemoArcSender() {
 
       const tx = await signer.sendTransaction({
         to: MEMO_ADDRESS,
-        data: memoInterface.encodeFunctionData("memo", [
-          USDC_ADDRESS,
-          transferData,
-          memoId,
-          memoBytes
-        ]),
+        data: memoInterface.encodeFunctionData("memo", [USDC_ADDRESS, transferData, memoId, memoBytes]),
         gasLimit: 400000,
       });
 
@@ -105,11 +104,10 @@ export default function MemoArcSender() {
       alert('✅ Транзакция отправлена! Ожидаем подтверждения...');
 
       const receipt = await tx.wait();
-      
       if (receipt) {
-        alert(`🎉 Успешно подтверждено! Блок: ${receipt.blockNumber}`);
+        alert(`🎉 Успешно! Блок: ${receipt.blockNumber}`);
       } else {
-        alert('✅ Транзакция отправлена и подтверждена!');
+        alert('✅ Транзакция подтверждена!');
       }
 
     } catch (e: any) {
@@ -126,29 +124,30 @@ export default function MemoArcSender() {
         <div className="text-center mb-10">
           <div className="inline-block bg-cyan-500/10 text-cyan-400 text-6xl mb-4 p-4 rounded-2xl">📝</div>
           <h1 className="text-5xl font-bold tracking-tight">Memo Arc Sender</h1>
-          <p className="text-slate-400 mt-3 text-lg">USDC + Memo в одной транзакции • ARC Testnet</p>
+          <p className="text-slate-400 mt-3 text-lg">USDC + Memo в одной транзакции</p>
         </div>
 
         {!isConnected && (
           <div className="flex flex-col gap-4 mb-8">
-            <button 
-              onClick={connectMetaMask}
-              className="bg-orange-600 hover:bg-orange-700 py-4 rounded-2xl font-semibold text-lg transition"
-            >
+            <button onClick={connectMetaMask} className="bg-orange-600 hover:bg-orange-700 py-4 rounded-2xl font-semibold text-lg transition">
               Подключить MetaMask
             </button>
-            <button 
-              onClick={connectWalletConnect}
-              className="bg-blue-600 hover:bg-blue-700 py-4 rounded-2xl font-semibold text-lg transition"
-            >
+            <button onClick={connectWalletConnect} className="bg-blue-600 hover:bg-blue-700 py-4 rounded-2xl font-semibold text-lg transition">
               Подключить WalletConnect
             </button>
           </div>
         )}
 
         {isConnected && isWrongNetwork && (
-          <div className="bg-red-500/10 border border-red-500 text-red-400 p-4 rounded-2xl mb-6 text-center">
-            ⚠️ Переключитесь на ARC Testnet (Chain ID: 5042002)
+          <div className="bg-amber-500/10 border border-amber-500 text-amber-400 p-6 rounded-2xl mb-6 text-center">
+            <p className="font-semibold mb-3">⚠️ Вы не в сети ARC Testnet</p>
+            <button
+              onClick={handleSwitchNetwork}
+              className="w-full bg-amber-500 hover:bg-amber-600 text-black font-semibold py-3.5 rounded-2xl transition"
+            >
+              Переключиться на ARC Testnet
+            </button>
+            <p className="text-xs mt-3 text-amber-500/70">Chain ID: 5042002</p>
           </div>
         )}
 
@@ -190,16 +189,12 @@ export default function MemoArcSender() {
               disabled={loading}
               className="w-full bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 py-4 rounded-2xl font-semibold text-xl transition-all disabled:opacity-50"
             >
-              {loading ? 'Отправка на ARC...' : 'Отправить USDC с Memo'}
+              {loading ? 'Отправка...' : 'Отправить USDC с Memo'}
             </button>
 
             {txHash && (
               <div className="text-center pt-4">
-                <a 
-                  href={`https://testnet.arcscan.app/tx/${txHash}`} 
-                  target="_blank" 
-                  className="text-cyan-400 hover:text-cyan-300 break-all text-sm"
-                >
+                <a href={`https://testnet.arcscan.app/tx/${txHash}`} target="_blank" className="text-cyan-400 hover:text-cyan-300 break-all text-sm">
                   {txHash}
                 </a>
               </div>
