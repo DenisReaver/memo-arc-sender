@@ -236,7 +236,7 @@ export default function MemoArcSender() {
               rel="noopener noreferrer"
               className="hover:text-cyan-400 transition-all hover:scale-110"
             >
-              F
+              Farcaster
             </a>
             <a 
               href="https://discord.gg/твой_инвайт" 
