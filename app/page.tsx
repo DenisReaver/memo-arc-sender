@@ -37,51 +37,39 @@ export default function MemoArcSender() {
       return;
     }
 
-    const fetchUSDCBalance = async () => {
+    const fetchBalance = async () => {
       try {
         if (!window.ethereum) return;
         const provider = new ethers.BrowserProvider(window.ethereum);
         const usdcAbi = ["function balanceOf(address account) view returns (uint256)"];
-        const usdcContract = new ethers.Contract(USDC_ADDRESS, usdcAbi, provider);
-
-        const balance = await usdcContract.balanceOf(address);
-        const formatted = ethers.formatUnits(balance, 6);
-        setUsdcBalance(Number(formatted).toFixed(6));
+        const contract = new ethers.Contract(USDC_ADDRESS, usdcAbi, provider);
+        const balance = await contract.balanceOf(address);
+        setUsdcBalance(ethers.formatUnits(balance, 6));
       } catch (e) {
         console.error(e);
         setUsdcBalance('0.000000');
       }
     };
 
-    fetchUSDCBalance();
+    fetchBalance();
   }, [address, isWrongNetwork]);
 
   const connectMetaMask = () => connect({ connector: injected() });
-  const connectWalletConnect = () => 
-    connect({ connector: walletConnect({ projectId: 'da13e8b76983976be4b39ecba29072bd' }) });
+  const connectWalletConnect = () => connect({ connector: walletConnect({ projectId: 'da13e8b76983976be4b39ecba29072bd' }) });
 
   const switchToArc = async () => {
     try {
       await switchChain({ chainId: ARC_CHAIN_ID });
-    } catch (e) {
-      alert('Не удалось переключить сеть автоматически.\n\nПереключите вручную на ARC Testnet (Chain ID: 5042002)');
+    } catch (e: any) {
+      alert('Не удалось автоматически переключить сеть.\n\nПожалуйста, переключите вручную в MetaMask на ARC Testnet (Chain ID: 5042002)');
     }
   };
 
   const sendWithMemo = async () => {
     if (!recipient || !amount) return alert('Заполни все поля');
 
-    // === ЯВНАЯ ПРОВЕРКА СЕТИ ПЕРЕД ОТПРАВКОЙ ===
-    if (isWrongNetwork || chainId !== ARC_CHAIN_ID) {
-      const confirmSwitch = window.confirm(
-        'Вы находитесь в неправильной сети!\n\n' +
-        'Для отправки USDC с Memo нужна сеть ARC Testnet (Chain ID: 5042002)\n\n' +
-        'Переключить сеть сейчас?'
-      );
-      
-      if (confirmSwitch) {
-        await switchToArc();
-      }
+    if (isWrongNetwork) {
+      alert('❌ Вы подключены не к ARC Testnet!\n\nНажмите кнопку "Переключиться на ARC Testnet" выше.');
       return;
     }
 
@@ -89,9 +77,7 @@ export default function MemoArcSender() {
     setTxHash('');
 
     try {
-      if (!window.ethereum) throw new Error('Кошелёк не найден');
-
-      const provider = new ethers.BrowserProvider(window.ethereum);
+      const provider = new ethers.BrowserProvider(window.ethereum!);
       const signer = await provider.getSigner();
 
       const amountWei = ethers.parseUnits(amount, 6);
@@ -114,15 +100,13 @@ export default function MemoArcSender() {
       });
 
       setTxHash(tx.hash);
-      alert('✅ Транзакция отправлена! Ожидаем подтверждения...');
+      alert('✅ Транзакция отправлена!');
 
       const receipt = await tx.wait();
-      if (receipt) {
-        alert(`🎉 Успешно подтверждено! Блок: ${receipt.blockNumber}`);
-      }
+      if (receipt) alert(`🎉 Успешно! Блок: ${receipt.blockNumber}`);
     } catch (e: any) {
       console.error(e);
-      alert('❌ ' + (e.shortMessage || e.message || 'Неизвестная ошибка'));
+      alert('❌ ' + (e.shortMessage || e.message || 'Ошибка транзакции'));
     } finally {
       setLoading(false);
     }
@@ -134,7 +118,7 @@ export default function MemoArcSender() {
         <div className="text-center mb-10">
           <div className="inline-block bg-cyan-500/10 text-cyan-400 text-6xl mb-4 p-4 rounded-2xl">📝</div>
           <h1 className="text-5xl font-bold tracking-tight">Memo Arc Sender</h1>
-          <p className="text-slate-400 mt-3 text-lg">USDC + Memo в одной транзакции</p>
+          <p className="text-slate-400 mt-3 text-lg">USDC + Memo • ARC Testnet</p>
         </div>
 
         {!isConnected && (
@@ -149,66 +133,54 @@ export default function MemoArcSender() {
         )}
 
         {isConnected && (
-          <div className="space-y-6">
-            {isWrongNetwork && (
-              <div className="bg-red-500/10 border border-red-500 text-red-400 p-5 rounded-2xl text-center">
-                <p className="font-semibold">⚠️ Вы в неправильной сети</p>
+          <>
+            {/* Кнопка переключения сети — всегда видна */}
+            <div className="mb-6">
+              {isWrongNetwork ? (
                 <button
                   onClick={switchToArc}
-                  className="mt-3 w-full bg-red-500 hover:bg-red-600 text-white py-3 rounded-xl font-medium"
+                  className="w-full bg-red-600 hover:bg-red-700 py-4 rounded-2xl font-semibold text-lg transition flex items-center justify-center gap-2"
                 >
-                  Переключиться на ARC Testnet
+                  🔄 Переключиться на ARC Testnet (5042002)
                 </button>
-              </div>
-            )}
-
-            <div className="bg-slate-800/50 border border-slate-700 rounded-2xl p-5 text-center">
-              <p className="text-slate-400 text-sm">Баланс USDC</p>
-              <p className="text-4xl font-semibold text-cyan-400 mt-1">
-                {usdcBalance} <span className="text-2xl text-slate-400">USDC</span>
-              </p>
+              ) : (
+                <div className="bg-green-500/10 border border-green-500 text-green-400 py-3 rounded-2xl text-center font-medium">
+                  ✅ Вы в сети ARC Testnet
+                </div>
+              )}
             </div>
 
-            <input
-              type="text"
-              value={recipient}
-              onChange={(e) => setRecipient(e.target.value)}
-              placeholder="Адрес получателя (0x...)"
-              className="w-full bg-slate-800 border border-slate-600 rounded-2xl px-5 py-4 focus:border-cyan-500 focus:outline-none text-white"
-            />
-
-            <input
-              type="number"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              step="0.000001"
-              placeholder="Сумма USDC"
-              className="w-full bg-slate-800 border border-slate-600 rounded-2xl px-5 py-4 focus:border-cyan-500 focus:outline-none text-white"
-            />
-
-            <textarea
-              value={memoText}
-              onChange={(e) => setMemoText(e.target.value)}
-              placeholder="Сообщение в memo..."
-              className="w-full bg-slate-800 border border-slate-600 rounded-2xl px-5 py-4 h-32 focus:border-cyan-500 focus:outline-none text-white resize-y"
-            />
-
-            <button
-              onClick={sendWithMemo}
-              disabled={loading}
-              className="w-full bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 py-4 rounded-2xl font-semibold text-xl transition-all disabled:opacity-50"
-            >
-              {loading ? 'Отправка...' : 'Отправить USDC с Memo'}
-            </button>
-
-            {txHash && (
-              <div className="text-center pt-4">
-                <a href={`https://testnet.arcscan.app/tx/${txHash}`} target="_blank" className="text-cyan-400 hover:text-cyan-300 break-all text-sm">
-                  {txHash}
-                </a>
+            <div className="space-y-6">
+              <div className="bg-slate-800/50 border border-slate-700 rounded-2xl p-5 text-center">
+                <p className="text-slate-400 text-sm">Баланс USDC</p>
+                <p className="text-4xl font-semibold text-cyan-400 mt-1">
+                  {usdcBalance} <span className="text-2xl text-slate-400">USDC</span>
+                </p>
               </div>
-            )}
-          </div>
+
+              <input type="text" value={recipient} onChange={(e) => setRecipient(e.target.value)} placeholder="Адрес получателя (0x...)" className="w-full bg-slate-800 border border-slate-600 rounded-2xl px-5 py-4 focus:border-cyan-500 focus:outline-none text-white" />
+
+              <input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} step="0.000001" placeholder="Сумма USDC" className="w-full bg-slate-800 border border-slate-600 rounded-2xl px-5 py-4 focus:border-cyan-500 focus:outline-none text-white" />
+
+              <textarea value={memoText} onChange={(e) => setMemoText(e.target.value)} placeholder="Сообщение в memo..." className="w-full bg-slate-800 border border-slate-600 rounded-2xl px-5 py-4 h-32 focus:border-cyan-500 focus:outline-none text-white resize-y" />
+
+              <button
+                onClick={sendWithMemo}
+                disabled={loading}
+                className="w-full bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 py-4 rounded-2xl font-semibold text-xl transition-all disabled:opacity-50"
+              >
+                {loading ? 'Отправка...' : 'Отправить USDC с Memo'}
+              </button>
+
+              {txHash && (
+                <div className="text-center pt-4">
+                  <a href={`https://testnet.arcscan.app/tx/${txHash}`} target="_blank" className="text-cyan-400 hover:text-cyan-300 break-all text-sm">
+                    {txHash}
+                  </a>
+                </div>
+              )}
+            </div>
+          </>
         )}
       </div>
     </div>
