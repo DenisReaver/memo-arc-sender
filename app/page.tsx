@@ -19,14 +19,20 @@ export default function MemoArcSender() {
   const [loading, setLoading] = useState(false);
   const [usdcBalance, setUsdcBalance] = useState('0.0000');
 
+  // Баланс USDC (только на клиенте)
   useEffect(() => {
+    if (typeof window === 'undefined' || !address) {
+      setUsdcBalance('0.0000');
+      return;
+    }
+
     const fetchBalance = async () => {
-      if (!address) {
-        setUsdcBalance('0.0000');
-        return;
-      }
       try {
-        const provider = new ethers.BrowserProvider(window.ethereum!);
+        if (!window.ethereum) {
+          setUsdcBalance('0.0000');
+          return;
+        }
+        const provider = new ethers.BrowserProvider(window.ethereum);
         const balance = await provider.getBalance(address);
         const formatted = ethers.formatUnits(balance, 6);
         setUsdcBalance(Number(formatted).toFixed(4));
@@ -42,13 +48,17 @@ export default function MemoArcSender() {
   const connectMetaMask = () => connect({ connector: injected() });
   const connectWalletConnect = () => connect({ connector: walletConnect({ projectId: 'da13e8b76983976be4b39ecba29072bd' }) });
 
-const sendWithMemo = async () => {
+  const sendWithMemo = async () => {
     if (!recipient || !amount) return alert('Заполни все поля');
 
     setLoading(true);
 
     try {
-      const provider = new ethers.BrowserProvider(window.ethereum!);
+      if (typeof window === 'undefined' || !window.ethereum) {
+        return alert('Кошелёк не найден');
+      }
+
+      const provider = new ethers.BrowserProvider(window.ethereum);
       const signer = await provider.getSigner();
 
       const amountWei = ethers.parseUnits(amount, 6);
@@ -64,35 +74,21 @@ const sendWithMemo = async () => {
         "function memo(address target, bytes data, bytes32 memoId, bytes memoData)"
       ]);
 
-      const data = memoInterface.encodeFunctionData("memo", [
-        USDC_ADDRESS, transferData, memoId, memoBytes
-      ]);
-
-      const gasEstimate = await provider.estimateGas({
-        to: MEMO_ADDRESS,
-        data,
-        from: address,
-      });
-
-      const feeData = await provider.getFeeData();
-
       const tx = await signer.sendTransaction({
         to: MEMO_ADDRESS,
-        data,
-        gasLimit: Math.floor(Number(gasEstimate) * 2.0),
-        maxFeePerGas: feeData.maxFeePerGas 
-          ? feeData.maxFeePerGas * 400n / 100n 
-          : ethers.parseUnits("0.8", 6),
-        maxPriorityFeePerGas: feeData.maxPriorityFeePerGas 
-          ? feeData.maxPriorityFeePerGas * 450n / 100n 
-          : ethers.parseUnits("0.2", 6),
+        data: memoInterface.encodeFunctionData("memo", [
+          USDC_ADDRESS, transferData, memoId, memoBytes
+        ]),
+        gasLimit: 450000,
+        maxFeePerGas: ethers.parseUnits("0.5", 6),
+        maxPriorityFeePerGas: ethers.parseUnits("0.1", 6),
       });
 
       setTxHash(tx.hash);
       alert('✅ Транзакция отправлена!');
 
-      const receipt = await tx.wait();
-      alert(`🎉 Успешно! Газ: ${receipt.gasUsed}`);
+      await tx.wait();
+      alert('🎉 Успешно подтверждена!');
 
     } catch (e: any) {
       console.error(e);
