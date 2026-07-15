@@ -29,7 +29,7 @@ export default function MemoArcSender() {
   const [currentChainId, setCurrentChainId] = useState<number | null>(null);
   const [isWrongNetwork, setIsWrongNetwork] = useState(false);
 
-  // Получаем реальный chainId напрямую от кошелька
+  // Получаем реальный chainId
   useEffect(() => {
     const getRealChainId = async () => {
       if (!window.ethereum || !isConnected) {
@@ -37,17 +37,14 @@ export default function MemoArcSender() {
         setIsWrongNetwork(false);
         return;
       }
-
       try {
         const provider = new ethers.BrowserProvider(window.ethereum);
         const network = await provider.getNetwork();
         const chainId = Number(network.chainId);
-        
         setCurrentChainId(chainId);
         setIsWrongNetwork(chainId !== ARC_CHAIN_ID);
       } catch (e) {
         console.error(e);
-        setCurrentChainId(null);
       }
     };
 
@@ -153,7 +150,7 @@ export default function MemoArcSender() {
 
         {isConnected && (
           <>
-            {/* Кнопка переключения */}
+            {/* Кнопка переключения сети */}
             <div className="mb-6">
               {isWrongNetwork ? (
                 <button
@@ -169,7 +166,6 @@ export default function MemoArcSender() {
               )}
             </div>
 
-            {/* Остальной интерфейс */}
             <div className="space-y-6">
               <div className="bg-slate-800/50 border border-slate-700 rounded-2xl p-5 text-center">
                 <p className="text-slate-400 text-sm">Баланс USDC</p>
@@ -178,14 +174,35 @@ export default function MemoArcSender() {
                 </p>
               </div>
 
-              {/* Поля ввода и кнопка отправки (оставь как у тебя было) */}
-              <input type="text" value={recipient} onChange={(e) => setRecipient(e.target.value)} placeholder="Адрес получателя (0x...)" className="w-full bg-slate-800 border border-slate-600 rounded-2xl px-5 py-4 focus:border-cyan-500 focus:outline-none text-white" />
+              <input
+                type="text"
+                value={recipient}
+                onChange={(e) => setRecipient(e.target.value)}
+                placeholder="Адрес получателя (0x...)"
+                className="w-full bg-slate-800 border border-slate-600 rounded-2xl px-5 py-4 focus:border-cyan-500 focus:outline-none text-white"
+              />
 
-              <input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} step="0.000001" placeholder="Сумма USDC" className="w-full bg-slate-800 border border-slate-600 rounded-2xl px-5 py-4 focus:border-cyan-500 focus:outline-none text-white" />
+              <input
+                type="number"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                step="0.000001"
+                placeholder="Сумма USDC"
+                className="w-full bg-slate-800 border border-slate-600 rounded-2xl px-5 py-4 focus:border-cyan-500 focus:outline-none text-white"
+              />
 
-              <textarea value={memoText} onChange={(e) => setMemoText(e.target.value)} placeholder="Сообщение в memo..." className="w-full bg-slate-800 border border-slate-600 rounded-2xl px-5 py-4 h-32 focus:border-cyan-500 focus:outline-none text-white resize-y" />
+              <textarea
+                value={memoText}
+                onChange={(e) => setMemoText(e.target.value)}
+                placeholder="Сообщение в memo..."
+                className="w-full bg-slate-800 border border-slate-600 rounded-2xl px-5 py-4 h-32 focus:border-cyan-500 focus:outline-none text-white resize-y"
+              />
 
-              <button onClick={sendWithMemo} disabled={loading} className="w-full bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 py-4 rounded-2xl font-semibold text-xl transition-all disabled:opacity-50">
+              <button
+                onClick={sendWithMemo}
+                disabled={loading}
+                className="w-full bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 py-4 rounded-2xl font-semibold text-xl transition-all disabled:opacity-50"
+              >
                 {loading ? 'Отправка...' : 'Отправить USDC с Memo'}
               </button>
 
@@ -199,6 +216,23 @@ export default function MemoArcSender() {
             </div>
           </>
         )}
+
+        {/* Социальные ссылки */}
+        <div className="mt-12 pt-6 border-t border-slate-700 text-center">
+          <p className="text-slate-400 text-sm mb-3">Следите за обновлениями</p>
+          <div className="flex justify-center gap-6 text-2xl">
+            <a href="https://twitter.com/твой_ник" target="_blank" className="hover:text-cyan-400 transition">
+              𝕏
+            </a>
+            <a href="https://warpcast.com/твой_ник" target="_blank" className="hover:text-cyan-400 transition">
+              Farcaster
+            </a>
+            <a href="https://discord.gg/твой_инвайт" target="_blank" className="hover:text-cyan-400 transition">
+              Discord
+            </a>
+          </div>
+          <p className="text-xs text-slate-500 mt-4">Made with ❤️ for ARC Testnet</p>
+        </div>
       </div>
     </div>
   );
