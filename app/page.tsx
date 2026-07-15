@@ -217,21 +217,38 @@ export default function MemoArcSender() {
           </>
         )}
 
-        {/* Социальные ссылки */}
+ {/* Социальные ссылки */}
         <div className="mt-12 pt-6 border-t border-slate-700 text-center">
-          <p className="text-slate-400 text-sm mb-3">Следите за обновлениями</p>
-          <div className="flex justify-center gap-6 text-2xl">
-            <a href="https://twitter.com/твой_ник" target="_blank" className="hover:text-cyan-400 transition">
+          <p className="text-slate-400 text-sm mb-4">Следите за обновлениями</p>
+          
+          <div className="flex justify-center gap-8 text-3xl">
+            <a 
+              href="https://twitter.com/твой_ник" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="hover:text-cyan-400 transition-all hover:scale-110"
+            >
               𝕏
             </a>
-            <a href="https://warpcast.com/твой_ник" target="_blank" className="hover:text-cyan-400 transition">
-              Farcaster
+            <a 
+              href="https://warpcast.com/твой_ник" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="hover:text-cyan-400 transition-all hover:scale-110"
+            >
+              F
             </a>
-            <a href="https://discord.gg/твой_инвайт" target="_blank" className="hover:text-cyan-400 transition">
+            <a 
+              href="https://discord.gg/твой_инвайт" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="hover:text-cyan-400 transition-all hover:scale-110"
+            >
               Discord
             </a>
           </div>
-          <p className="text-xs text-slate-500 mt-4">Made with ❤️ for ARC Testnet</p>
+
+          <p className="text-xs text-slate-500 mt-5">Made with ❤️ for ARC Testnet</p>
         </div>
       </div>
     </div>
