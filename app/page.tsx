@@ -33,7 +33,7 @@ export default function MemoArcSender() {
     setIsWrongNetwork(isConnected && chainId !== ARC_CHAIN_ID);
   }, [isConnected, chainId]);
 
-  // Баланс USDC (правильный ERC-20 balanceOf)
+  // Баланс USDC
   useEffect(() => {
     if (!address || chainId !== ARC_CHAIN_ID) {
       setUsdcBalance('0.000000');
@@ -66,7 +66,7 @@ export default function MemoArcSender() {
 
   const sendWithMemo = async () => {
     if (!recipient || !amount) return alert('Заполни все поля');
-    if (chainId !== ARC_CHAIN_ID) return alert('Пожалуйста, переключитесь на ARC Testnet');
+    if (chainId !== ARC_CHAIN_ID) return alert('Пожалуйста, переключитесь на ARC Testnet (Chain ID: 5042002)');
 
     setLoading(true);
     setTxHash('');
@@ -79,7 +79,6 @@ export default function MemoArcSender() {
 
       const amountWei = ethers.parseUnits(amount, 6);
 
-      // Данные для вызова transfer в USDC
       const transferData = new ethers.Interface([
         "function transfer(address to, uint256 amount)"
       ]).encodeFunctionData("transfer", [recipient, amountWei]);
@@ -99,14 +98,19 @@ export default function MemoArcSender() {
           memoId,
           memoBytes
         ]),
-        gasLimit: 400000,           // Оптимально для ARC
+        gasLimit: 400000,
       });
 
       setTxHash(tx.hash);
-      alert('✅ Транзакция отправлена!');
+      alert('✅ Транзакция отправлена! Ожидаем подтверждения...');
 
       const receipt = await tx.wait();
-      alert(`🎉 Успешно! Блок: ${receipt.blockNumber}`);
+      
+      if (receipt) {
+        alert(`🎉 Успешно подтверждено! Блок: ${receipt.blockNumber}`);
+      } else {
+        alert('✅ Транзакция отправлена и подтверждена!');
+      }
 
     } catch (e: any) {
       console.error(e);
@@ -150,7 +154,6 @@ export default function MemoArcSender() {
 
         {isConnected && !isWrongNetwork && (
           <div className="space-y-6">
-            {/* Баланс */}
             <div className="bg-slate-800/50 border border-slate-700 rounded-2xl p-5 text-center">
               <p className="text-slate-400 text-sm">Баланс USDC</p>
               <p className="text-4xl font-semibold text-cyan-400 mt-1">
