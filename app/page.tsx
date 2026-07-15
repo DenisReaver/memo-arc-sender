@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useAccount, useConnect, useChainId, useSwitchChain } from 'wagmi';
+import { useAccount, useConnect, useSwitchChain } from 'wagmi';
 import { injected, walletConnect } from 'wagmi/connectors';
 import { ethers } from 'ethers';
 
@@ -18,7 +18,6 @@ declare global {
 export default function MemoArcSender() {
   const { isConnected, address } = useAccount();
   const { connect } = useConnect();
-  const chainId = useChainId();
   const { switchChain } = useSwitchChain();
 
   const [recipient, setRecipient] = useState('');
@@ -27,19 +26,43 @@ export default function MemoArcSender() {
   const [txHash, setTxHash] = useState('');
   const [loading, setLoading] = useState(false);
   const [usdcBalance, setUsdcBalance] = useState('0.000000');
+  const [currentChainId, setCurrentChainId] = useState<number | null>(null);
+  const [isWrongNetwork, setIsWrongNetwork] = useState(false);
 
-  const isWrongNetwork = isConnected && chainId !== ARC_CHAIN_ID;
+  // Получаем реальный chainId напрямую от кошелька
+  useEffect(() => {
+    const getRealChainId = async () => {
+      if (!window.ethereum || !isConnected) {
+        setCurrentChainId(null);
+        setIsWrongNetwork(false);
+        return;
+      }
+
+      try {
+        const provider = new ethers.BrowserProvider(window.ethereum);
+        const network = await provider.getNetwork();
+        const chainId = Number(network.chainId);
+        
+        setCurrentChainId(chainId);
+        setIsWrongNetwork(chainId !== ARC_CHAIN_ID);
+      } catch (e) {
+        console.error(e);
+        setCurrentChainId(null);
+      }
+    };
+
+    getRealChainId();
+  }, [isConnected]);
 
   // Баланс USDC
   useEffect(() => {
-    if (!address || isWrongNetwork) {
+    if (!address || isWrongNetwork || !window.ethereum) {
       setUsdcBalance('0.000000');
       return;
     }
 
     const fetchBalance = async () => {
       try {
-        if (!window.ethereum) return;
         const provider = new ethers.BrowserProvider(window.ethereum);
         const usdcAbi = ["function balanceOf(address account) view returns (uint256)"];
         const contract = new ethers.Contract(USDC_ADDRESS, usdcAbi, provider);
@@ -60,16 +83,15 @@ export default function MemoArcSender() {
   const switchToArc = async () => {
     try {
       await switchChain({ chainId: ARC_CHAIN_ID });
-    } catch (e: any) {
-      alert('Не удалось автоматически переключить сеть.\n\nПожалуйста, переключите вручную в MetaMask на ARC Testnet (Chain ID: 5042002)');
+    } catch (e) {
+      alert('Не удалось переключить автоматически.\n\nПереключи вручную на ARC Testnet (Chain ID: 5042002)');
     }
   };
 
   const sendWithMemo = async () => {
     if (!recipient || !amount) return alert('Заполни все поля');
-
     if (isWrongNetwork) {
-      alert('❌ Вы подключены не к ARC Testnet!\n\nНажмите кнопку "Переключиться на ARC Testnet" выше.');
+      alert('❌ Вы не в сети ARC Testnet!\n\nНажмите кнопку выше для переключения.');
       return;
     }
 
@@ -82,16 +104,13 @@ export default function MemoArcSender() {
 
       const amountWei = ethers.parseUnits(amount, 6);
 
-      const transferData = new ethers.Interface([
-        "function transfer(address to, uint256 amount)"
-      ]).encodeFunctionData("transfer", [recipient, amountWei]);
+      const transferData = new ethers.Interface(["function transfer(address to, uint256 amount)"])
+        .encodeFunctionData("transfer", [recipient, amountWei]);
 
       const memoId = ethers.id(`memo-${Date.now()}`);
       const memoBytes = ethers.toUtf8Bytes(memoText);
 
-      const memoInterface = new ethers.Interface([
-        "function memo(address target, bytes data, bytes32 memoId, bytes memoData)"
-      ]);
+      const memoInterface = new ethers.Interface(["function memo(address target, bytes data, bytes32 memoId, bytes memoData)"]);
 
       const tx = await signer.sendTransaction({
         to: MEMO_ADDRESS,
@@ -106,7 +125,7 @@ export default function MemoArcSender() {
       if (receipt) alert(`🎉 Успешно! Блок: ${receipt.blockNumber}`);
     } catch (e: any) {
       console.error(e);
-      alert('❌ ' + (e.shortMessage || e.message || 'Ошибка транзакции'));
+      alert('❌ ' + (e.shortMessage || e.message));
     } finally {
       setLoading(false);
     }
@@ -134,22 +153,23 @@ export default function MemoArcSender() {
 
         {isConnected && (
           <>
-            {/* Кнопка переключения сети — всегда видна */}
+            {/* Кнопка переключения */}
             <div className="mb-6">
               {isWrongNetwork ? (
                 <button
                   onClick={switchToArc}
-                  className="w-full bg-red-600 hover:bg-red-700 py-4 rounded-2xl font-semibold text-lg transition flex items-center justify-center gap-2"
+                  className="w-full bg-red-600 hover:bg-red-700 py-4 rounded-2xl font-semibold text-lg transition"
                 >
                   🔄 Переключиться на ARC Testnet (5042002)
                 </button>
               ) : (
-                <div className="bg-green-500/10 border border-green-500 text-green-400 py-3 rounded-2xl text-center font-medium">
-                  ✅ Вы в сети ARC Testnet
+                <div className="bg-emerald-500/20 border border-emerald-500 text-emerald-400 py-4 rounded-2xl text-center font-medium">
+                  ✅ Сейчас в сети ARC Testnet
                 </div>
               )}
             </div>
 
+            {/* Остальной интерфейс */}
             <div className="space-y-6">
               <div className="bg-slate-800/50 border border-slate-700 rounded-2xl p-5 text-center">
                 <p className="text-slate-400 text-sm">Баланс USDC</p>
@@ -158,17 +178,14 @@ export default function MemoArcSender() {
                 </p>
               </div>
 
+              {/* Поля ввода и кнопка отправки (оставь как у тебя было) */}
               <input type="text" value={recipient} onChange={(e) => setRecipient(e.target.value)} placeholder="Адрес получателя (0x...)" className="w-full bg-slate-800 border border-slate-600 rounded-2xl px-5 py-4 focus:border-cyan-500 focus:outline-none text-white" />
 
               <input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} step="0.000001" placeholder="Сумма USDC" className="w-full bg-slate-800 border border-slate-600 rounded-2xl px-5 py-4 focus:border-cyan-500 focus:outline-none text-white" />
 
               <textarea value={memoText} onChange={(e) => setMemoText(e.target.value)} placeholder="Сообщение в memo..." className="w-full bg-slate-800 border border-slate-600 rounded-2xl px-5 py-4 h-32 focus:border-cyan-500 focus:outline-none text-white resize-y" />
 
-              <button
-                onClick={sendWithMemo}
-                disabled={loading}
-                className="w-full bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 py-4 rounded-2xl font-semibold text-xl transition-all disabled:opacity-50"
-              >
+              <button onClick={sendWithMemo} disabled={loading} className="w-full bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 py-4 rounded-2xl font-semibold text-xl transition-all disabled:opacity-50">
                 {loading ? 'Отправка...' : 'Отправить USDC с Memo'}
               </button>
 
